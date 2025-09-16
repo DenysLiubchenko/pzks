@@ -72,9 +72,13 @@ public class SyntaxAnalyzer {
       errors.add(new Error(lastToken.getEndPosition(), lastToken.getEndPosition(), "There are unclosed brackets in query"));
     }
 
-    System.out.println("Errors: ");
-    for (int i = 0; i < errors.size(); i++) {
-      System.out.println(i+1 + ". " + errors.get(i));
+    if (errors.isEmpty()) {
+      System.out.println("Query has no errors");
+    } else {
+      System.out.println("Errors: ");
+      for (int i = 0; i < errors.size(); i++) {
+        System.out.println(i + 1 + ". " + errors.get(i));
+      }
     }
   }
 
