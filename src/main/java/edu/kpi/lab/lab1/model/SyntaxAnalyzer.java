@@ -22,8 +22,12 @@ import static edu.kpi.lab.lab1.model.SyntaxType.FUNCTION_CLOSE_BRACKET;
 import static edu.kpi.lab.lab1.model.SyntaxType.FUNCTION_OPEN_BRACKET;
 import static edu.kpi.lab.lab1.model.SyntaxType.OPEN_BRACKET;
 import static edu.kpi.lab.lab1.model.SyntaxType.OPERAND;
-import static edu.kpi.lab.lab1.model.SyntaxType.OPERATION_ADD_OR_MINUS;
-import static edu.kpi.lab.lab1.model.SyntaxType.OPERATION_MULTIPLY_OR_DIVIDE;
+import static edu.kpi.lab.lab1.model.SyntaxType.OPERATION_ADD;
+import static edu.kpi.lab.lab1.model.SyntaxType.OPERATION_ADD;
+import static edu.kpi.lab.lab1.model.SyntaxType.OPERATION_DIVIDE;
+import static edu.kpi.lab.lab1.model.SyntaxType.OPERATION_MINUS;
+import static edu.kpi.lab.lab1.model.SyntaxType.OPERATION_MULTIPLY;
+import static edu.kpi.lab.lab1.model.SyntaxType.OPERATION_MULTIPLY;
 import static edu.kpi.lab.lab1.model.SyntaxType.START;
 
 public class SyntaxAnalyzer {
@@ -35,21 +39,22 @@ public class SyntaxAnalyzer {
     operandTypes = Set.of(TokenType.INTEGER, TokenType.DECIMAL, TokenType.CONSTANT, TokenType.FUNCTION);
     allowedCombinations = new HashMap<>();
     allowedCombinations.put(START,
-      Set.of(OPEN_BRACKET, OPERAND, FUNCTION, OPERATION_ADD_OR_MINUS)); // replace OPERAND with FIRST_OPERAND
+      Set.of(OPEN_BRACKET, OPERAND, FUNCTION, OPERATION_ADD, OPERATION_MINUS));
     allowedCombinations.put(OPEN_BRACKET,
-      Set.of(OPEN_BRACKET, OPERAND, FUNCTION, OPERATION_ADD_OR_MINUS)); // replace OPERAND with FIRST_OPERAND
-//    allowedCombinations.put(FIRST_OPERAND, Set.of(OPERATION_ADD_OR_MINUS, OPERATION_MULTIPLY_OR_DIVIDE));
-    allowedCombinations.put(OPERATION_ADD_OR_MINUS, Set.of(OPERAND, FUNCTION, OPEN_BRACKET)); // add FIRST_OPERAND
-    allowedCombinations.put(OPERATION_MULTIPLY_OR_DIVIDE, Set.of(OPEN_BRACKET, FUNCTION, OPERAND));
+      Set.of(OPEN_BRACKET, OPERAND, FUNCTION, OPERATION_ADD, OPERATION_MINUS));
+    allowedCombinations.put(OPERATION_ADD, Set.of(OPERAND, FUNCTION, OPEN_BRACKET));
+    allowedCombinations.put(OPERATION_MINUS, Set.of(OPERAND, FUNCTION, OPEN_BRACKET));
+    allowedCombinations.put(OPERATION_MULTIPLY, Set.of(OPEN_BRACKET, FUNCTION, OPERAND));
+    allowedCombinations.put(OPERATION_DIVIDE, Set.of(OPEN_BRACKET, FUNCTION, OPERAND));
     allowedCombinations.put(OPERAND,
-      Set.of(OPERATION_ADD_OR_MINUS, OPERATION_MULTIPLY_OR_DIVIDE, CLOSE_BRACKET, FUNCTION_CLOSE_BRACKET, FINISH));
+      Set.of(OPERATION_ADD, OPERATION_MINUS, OPERATION_MULTIPLY, OPERATION_DIVIDE, CLOSE_BRACKET, FUNCTION_CLOSE_BRACKET, FINISH));
     allowedCombinations.put(CLOSE_BRACKET,
-      Set.of(OPERATION_ADD_OR_MINUS, OPERATION_MULTIPLY_OR_DIVIDE, CLOSE_BRACKET, FUNCTION_CLOSE_BRACKET, FINISH));
+      Set.of(OPERATION_ADD, OPERATION_MINUS, OPERATION_MULTIPLY, OPERATION_DIVIDE, CLOSE_BRACKET, FUNCTION_CLOSE_BRACKET, FINISH));
     allowedCombinations.put(FUNCTION, Set.of(FUNCTION_OPEN_BRACKET));
     allowedCombinations.put(FUNCTION_OPEN_BRACKET,
-      Set.of(FUNCTION, OPERAND, OPEN_BRACKET, FUNCTION_CLOSE_BRACKET)); // replace OPERAND with FIRST_OPERAND
+      Set.of(FUNCTION, OPERAND, OPEN_BRACKET, FUNCTION_CLOSE_BRACKET));
     allowedCombinations.put(FUNCTION_CLOSE_BRACKET,
-      Set.of(OPERATION_ADD_OR_MINUS, OPERATION_MULTIPLY_OR_DIVIDE, CLOSE_BRACKET, FUNCTION_CLOSE_BRACKET, FINISH));
+      Set.of(OPERATION_ADD, OPERATION_MINUS, OPERATION_MULTIPLY, OPERATION_DIVIDE, CLOSE_BRACKET, FUNCTION_CLOSE_BRACKET, FINISH));
     allowedCombinations.put(ERROR, Arrays.stream(SyntaxType.values()).filter(st-> st != ERROR).collect(Collectors.toSet()));
   }
 
@@ -57,11 +62,11 @@ public class SyntaxAnalyzer {
     List<Error> errors = new ArrayList<>();
     Stack<SyntaxType> openedBrackets = new Stack<>();
 
-    validateTokenWith(errors, openedBrackets, tokens.getFirst(), allowedCombinations.get(START));
+    validateTokenWith(errors, openedBrackets, tokens.getFirst(), START);
 
     for (int i = 1; i < tokens.size(); i++) {
       validateTokenWith(errors, openedBrackets,
-        tokens.get(i), allowedCombinations.get(getTokenSyntaxType(tokens.get(i - 1))));
+        tokens.get(i), getTokenSyntaxType(tokens.get(i - 1)));
     }
 
     Token lastToken = tokens.getLast();
@@ -83,7 +88,8 @@ public class SyntaxAnalyzer {
   }
 
   private void validateTokenWith(List<Error> errors, Stack<SyntaxType> openedBrackets, Token token,
-                                 Set<SyntaxType> allowedPositions) {
+                                 SyntaxType previousTokenSyntaxType) {
+    Set<SyntaxType> allowedPositions = allowedCombinations.get(previousTokenSyntaxType);
     SyntaxType syntaxType = getTokenSyntaxType(token);
     try {
       if (syntaxType == OPEN_BRACKET || syntaxType == FUNCTION_OPEN_BRACKET) {
@@ -98,6 +104,10 @@ public class SyntaxAnalyzer {
         if (pop != FUNCTION_OPEN_BRACKET) {
           throw new IllegalArgumentException("Function bracket must be closed");
         }
+      }
+      
+      if (token.getTokenType().equals(TokenType.INTEGER) && token.getValue().equals("0") && previousTokenSyntaxType.equals(OPERATION_DIVIDE)) {
+        errors.add(new Error(token.getEndPosition(), token.getEndPosition(), "Divide by zero"));
       }
 
       boolean isPlaceCorrect = allowedPositions.contains(syntaxType);
@@ -122,10 +132,14 @@ public class SyntaxAnalyzer {
       } else {
         return OPERAND;
       }
-    } else if (tokenType.equals(TokenType.OPERATION_ADD_OR_MINUS)) {
-      return OPERATION_ADD_OR_MINUS;
-    } else if (tokenType.equals(TokenType.OPERATION_MULTIPLY_OR_DIVIDE)) {
-      return OPERATION_MULTIPLY_OR_DIVIDE;
+    } else if (tokenType.equals(TokenType.OPERATION_ADD)) {
+      return OPERATION_ADD;
+    }else if (tokenType.equals(TokenType.OPERATION_MINUS)) {
+      return OPERATION_MINUS;
+    } else if (tokenType.equals(TokenType.OPERATION_MULTIPLY)) {
+      return OPERATION_MULTIPLY;
+    } else if (tokenType.equals(TokenType.OPERATION_DIVIDE)) {
+      return OPERATION_DIVIDE;
     } else if (tokenType.equals(TokenType.OPEN_BRACKET)) {
       return OPEN_BRACKET;
     } else if (tokenType.equals(TokenType.CLOSE_BRACKET)) {

@@ -17,7 +17,7 @@ public class LexicalAnalyzer {
     List<Token> query = new LinkedList<>();
     Stack<TokenType> openedBrackets = new Stack<>();
 
-    for(int i = 0; i < charArray.length; i++) {
+    for (int i = 0; i < charArray.length; i++) {
 
       if (charArray[i] == '(') {
         if (currentToken.getTokenType() == TokenType.CONSTANT) {
@@ -41,15 +41,20 @@ public class LexicalAnalyzer {
         } catch (EmptyStackException e) {
           currentToken = addAndFinishAnother(currentToken, i, query, TokenType.CLOSE_BRACKET, charArray);
         }
-      } else if (charArray[i] == '+' || charArray[i] == '-') {
-        currentToken = addAndFinishAnother(currentToken, i, query, TokenType.OPERATION_ADD_OR_MINUS, charArray);
-      } else if (charArray[i] == '*' || charArray[i] == '/') {
-        currentToken = addAndFinishAnother(currentToken, i, query, TokenType.OPERATION_MULTIPLY_OR_DIVIDE, charArray);
+      } else if (charArray[i] == '+') {
+        currentToken = addAndFinishAnother(currentToken, i, query, TokenType.OPERATION_ADD, charArray);
+      } else if (charArray[i] == '-') {
+        currentToken = addAndFinishAnother(currentToken, i, query, TokenType.OPERATION_MINUS, charArray);
+      } else if (charArray[i] == '*') {
+        currentToken = addAndFinishAnother(currentToken, i, query, TokenType.OPERATION_MULTIPLY, charArray);
+      }else if (charArray[i] == '/') {
+        currentToken = addAndFinishAnother(currentToken, i, query, TokenType.OPERATION_DIVIDE, charArray);
       } else if (charArray[i] == '.') {
         if (currentToken.getTokenType() == TokenType.INTEGER) {
           currentToken.setTokenType(TokenType.DECIMAL);
           currentToken.addToValue(charArray[i]);
-        } else if (currentToken.getTokenType() == TokenType.DECIMAL || currentToken.getTokenType() == TokenType.FUNCTION) {
+        } else if (currentToken.getTokenType() == TokenType.DECIMAL ||
+                   currentToken.getTokenType() == TokenType.FUNCTION) {
           currentToken.addToValue(charArray[i]);
         } else {
           currentToken = addAndFinishAnother(currentToken, i, query, TokenType.ERROR, charArray);
@@ -58,7 +63,10 @@ public class LexicalAnalyzer {
         if (currentToken.getTokenType() == null) {
           currentToken.setTokenType(TokenType.INTEGER);
           currentToken.addToValue(charArray[i]);
-        } else if (currentToken.getTokenType() == TokenType.INTEGER || currentToken.getTokenType() == TokenType.DECIMAL || currentToken.getTokenType() == TokenType.FUNCTION) {
+        } else if (currentToken.getTokenType() == TokenType.INTEGER ||
+                   currentToken.getTokenType() == TokenType.DECIMAL ||
+                   currentToken.getTokenType() == TokenType.FUNCTION ||
+                   currentToken.getTokenType() == TokenType.CONSTANT) {
           currentToken.addToValue(charArray[i]);
         } else {
           currentToken = addAndFinishAnother(currentToken, i, query, TokenType.ERROR, charArray);
@@ -67,7 +75,8 @@ public class LexicalAnalyzer {
         if (currentToken.getTokenType() == null) {
           currentToken.setTokenType(TokenType.CONSTANT);
           currentToken.addToValue(charArray[i]);
-        } else if (currentToken.getTokenType() == TokenType.CONSTANT || currentToken.getTokenType() == TokenType.FUNCTION) {
+        } else if (currentToken.getTokenType() == TokenType.CONSTANT ||
+                   currentToken.getTokenType() == TokenType.FUNCTION) {
           currentToken.addToValue(charArray[i]);
         } else {
           currentToken = addAndFinishAnother(currentToken, i, query, TokenType.ERROR, charArray);
@@ -83,9 +92,10 @@ public class LexicalAnalyzer {
     return query;
   }
 
-  private Token addAndFinishAnother(Token currentToken, int i, List<Token> query, TokenType tokenType, char[] charArray) {
+  private Token addAndFinishAnother(Token currentToken, int i, List<Token> query, TokenType tokenType,
+                                    char[] charArray) {
     if (currentToken.getTokenType() != null) {
-      currentToken = finishProcessing(currentToken, i-1, query);
+      currentToken = finishProcessing(currentToken, i - 1, query);
     }
     currentToken.setTokenType(tokenType);
     currentToken.addToValue(charArray[i]);
