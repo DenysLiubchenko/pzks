@@ -1,66 +1,23 @@
 package edu.kpi.lab.model.syntax;
 
 import edu.kpi.lab.model.lexical.Token;
-import edu.kpi.lab.model.lexical.TokenType;
 import edu.kpi.lab.model.syntax.tree.Function;
 import edu.kpi.lab.model.syntax.tree.Node;
 import edu.kpi.lab.model.syntax.tree.Operand;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.EmptyStackException;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Queue;
-import java.util.Set;
 import java.util.Stack;
-import java.util.stream.Collectors;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
 
-import static edu.kpi.lab.model.syntax.SyntaxType.CLOSE_BRACKET;
-import static edu.kpi.lab.model.syntax.SyntaxType.ERROR;
-import static edu.kpi.lab.model.syntax.SyntaxType.FINISH;
-import static edu.kpi.lab.model.syntax.SyntaxType.FUNCTION;
-import static edu.kpi.lab.model.syntax.SyntaxType.FUNCTION_CLOSE_BRACKET;
-import static edu.kpi.lab.model.syntax.SyntaxType.FUNCTION_OPEN_BRACKET;
-import static edu.kpi.lab.model.syntax.SyntaxType.OPEN_BRACKET;
 import static edu.kpi.lab.model.syntax.SyntaxType.OPERAND;
 import static edu.kpi.lab.model.syntax.SyntaxType.OPERATION_ADD;
 import static edu.kpi.lab.model.syntax.SyntaxType.OPERATION_DIVIDE;
 import static edu.kpi.lab.model.syntax.SyntaxType.OPERATION_MINUS;
 import static edu.kpi.lab.model.syntax.SyntaxType.OPERATION_MULTIPLY;
-import static edu.kpi.lab.model.syntax.SyntaxType.START;
+import static edu.kpi.lab.model.syntax.SyntaxValidator.getTokenSyntaxType;
 
 public class SyntaxAnalyzer {
-
-  private final Map<SyntaxType, Set<SyntaxType>> allowedCombinations;
-  private final Set<TokenType> operandTypes;
-
-  {
-    operandTypes = Set.of(TokenType.INTEGER, TokenType.DECIMAL, TokenType.CONSTANT, TokenType.FUNCTION);
-    allowedCombinations = new HashMap<>();
-    allowedCombinations.put(START,
-      Set.of(OPEN_BRACKET, OPERAND, FUNCTION, OPERATION_ADD, OPERATION_MINUS));
-    allowedCombinations.put(OPEN_BRACKET,
-      Set.of(OPEN_BRACKET, OPERAND, FUNCTION, OPERATION_ADD, OPERATION_MINUS));
-    allowedCombinations.put(OPERATION_ADD, Set.of(OPERAND, FUNCTION, OPEN_BRACKET));
-    allowedCombinations.put(OPERATION_MINUS, Set.of(OPERAND, FUNCTION, OPEN_BRACKET));
-    allowedCombinations.put(OPERATION_MULTIPLY, Set.of(OPEN_BRACKET, FUNCTION, OPERAND));
-    allowedCombinations.put(OPERATION_DIVIDE, Set.of(OPEN_BRACKET, FUNCTION, OPERAND));
-    allowedCombinations.put(OPERAND,
-      Set.of(OPERATION_ADD, OPERATION_MINUS, OPERATION_MULTIPLY, OPERATION_DIVIDE, CLOSE_BRACKET, FUNCTION_CLOSE_BRACKET, FINISH));
-    allowedCombinations.put(CLOSE_BRACKET,
-      Set.of(OPERATION_ADD, OPERATION_MINUS, OPERATION_MULTIPLY, OPERATION_DIVIDE, CLOSE_BRACKET, FUNCTION_CLOSE_BRACKET, FINISH));
-    allowedCombinations.put(FUNCTION, Set.of(FUNCTION_OPEN_BRACKET));
-    allowedCombinations.put(FUNCTION_OPEN_BRACKET,
-      Set.of(FUNCTION, OPERAND, OPEN_BRACKET, FUNCTION_CLOSE_BRACKET));
-    allowedCombinations.put(FUNCTION_CLOSE_BRACKET,
-      Set.of(OPERATION_ADD, OPERATION_MINUS, OPERATION_MULTIPLY, OPERATION_DIVIDE, CLOSE_BRACKET, FUNCTION_CLOSE_BRACKET, FINISH));
-    allowedCombinations.put(ERROR, Arrays.stream(SyntaxType.values()).filter(st-> st != ERROR).collect(Collectors.toSet()));
-  }
 
   public Function buildSyntaxTree(List<Token> tokens) {
     List<Node> operands = new ArrayList<>();
@@ -76,7 +33,9 @@ public class SyntaxAnalyzer {
       throw new IllegalArgumentException("Single operand cannot form expression tree");
     }
 
-    return buildBalancedParallelTree(operands, operators);
+    Function tree = buildBalancedParallelTree(operands, operators);
+
+    return optimizeTree(tree);
   }
 
   private void parseTokensToList(List<Token> tokens, List<Node> operands, List<SyntaxType> operators) {
@@ -86,21 +45,41 @@ public class SyntaxAnalyzer {
     List<Node> currentOperands = new ArrayList<>();
     List<SyntaxType> currentOperators = new ArrayList<>();
 
-    int pos = 0;
+    boolean expectOperand = true;
 
     for (Token token : tokens) {
       SyntaxType type = getTokenSyntaxType(token);
 
       switch (type) {
         case OPERAND:
-          currentOperands.add(new Operand(pos++, OPERAND, token.getValue()));
+          currentOperands.add(new Operand(OPERAND, token.getValue()));
+          expectOperand = false;
+          break;
+
+        case OPERATION_MINUS:
+          if (expectOperand) {
+            currentOperands.add(new Operand(OPERAND, "0"));
+            currentOperators.add(OPERATION_MINUS);
+            expectOperand = true;
+          } else {
+            currentOperators.add(OPERATION_MINUS);
+            expectOperand = true;
+          }
           break;
 
         case OPERATION_ADD:
-        case OPERATION_MINUS:
+          if (expectOperand) {
+            expectOperand = true;
+          } else {
+            currentOperators.add(OPERATION_ADD);
+            expectOperand = true;
+          }
+          break;
+
         case OPERATION_MULTIPLY:
         case OPERATION_DIVIDE:
           currentOperators.add(type);
+          expectOperand = true;
           break;
 
         case OPEN_BRACKET:
@@ -108,6 +87,7 @@ public class SyntaxAnalyzer {
           operatorStack.push(new ArrayList<>(currentOperators));
           currentOperands = new ArrayList<>();
           currentOperators = new ArrayList<>();
+          expectOperand = true;
           break;
 
         case CLOSE_BRACKET:
@@ -117,6 +97,7 @@ public class SyntaxAnalyzer {
             currentOperators = operatorStack.pop();
             currentOperands.add(bracketResult);
           }
+          expectOperand = false;
           break;
       }
     }
@@ -127,7 +108,21 @@ public class SyntaxAnalyzer {
 
   private Function buildBalancedParallelTree(List<Node> operands, List<SyntaxType> operators) {
     if (operators.isEmpty()) {
-      throw new IllegalArgumentException("No operators");
+      if (operands.size() == 1) {
+        if (operands.getFirst() instanceof Function) {
+          return (Function) operands.getFirst();
+        } else {
+          throw new IllegalArgumentException("Single operand cannot form expression tree");
+        }
+      } else {
+        throw new IllegalArgumentException("Multiple operands but no operators");
+      }
+    }
+
+    if (operators.size() != operands.size() - 1) {
+      throw new IllegalArgumentException(
+        String.format("Invalid expression: %d operands but %d operators. Expected %d operators.",
+          operands.size(), operators.size(), operands.size() - 1));
     }
 
     List<Node> processedOperands = new ArrayList<>();
@@ -141,7 +136,7 @@ public class SyntaxAnalyzer {
 
       if (op == OPERATION_MULTIPLY || op == OPERATION_DIVIDE) {
         Node left = processedOperands.removeLast();
-        Function func = new Function(0);
+        Function func = new Function();
         func.setOperation(op);
         func.setLeft(left);
         func.setRight(rightOperand);
@@ -174,7 +169,7 @@ public class SyntaxAnalyzer {
         Node left = queue.poll();
         Node right = queue.poll();
 
-        Function func = new Function(0);
+        Function func = new Function();
         func.setOperation(operation);
         func.setLeft(left);
         func.setRight(right);
@@ -192,179 +187,284 @@ public class SyntaxAnalyzer {
     return queue.poll();
   }
 
-  public void printTreeStructure(Function root) {
-    System.out.println("Parallel Tree Structure:");
-    printTreeStructure(root, 0, "Root");
-    System.out.println("Tree height: " + getTreeHeight(root));
-    System.out.println("Max width: " + getMaxWidth(root));
+  public Function optimizeTree(Function root) {
+    if (root == null) {
+      return null;
+    }
+
+    Function current = root;
+    Function previous;
+    int iterations = 0;
+    int maxIterations = 100;
+
+    do {
+      previous = copyTree(current);
+      current = (Function) optimizeNode(current);
+      iterations++;
+    } while (!treesEqual(current, previous) && iterations < maxIterations);
+
+    return current;
   }
 
-  private void printTreeStructure(Node node, int level, String position) {
-    if (node == null) return;
-
-    String indent = "  ".repeat(level);
-
-    if (node instanceof Function function) {
-      System.out.println(indent + position + ": Operation: " + function.getOperation());
-
-      if (function.getLeft() != null) {
-        printTreeStructure(function.getLeft(), level + 1, "Left");
+  private Node optimizeNode(Node node) {
+    switch (node) {
+      case null -> {
+        return null;
       }
-      if (function.getRight() != null) {
-        printTreeStructure(function.getRight(), level + 1, "Right");
+      case Function func -> {
+        Node leftOptimized = optimizeNode(func.getLeft());
+        Node rightOptimized = optimizeNode(func.getRight());
+
+        func.setLeft(leftOptimized);
+        func.setRight(rightOptimized);
+
+        return applyAlgebraicOptimizations(func);
       }
-    } else if (node instanceof Operand operand) {
-      System.out.println(indent + position + ": Operand(type=" + operand.getType() + ", value=" + operand.getValue() + ")");
-    }
-  }
-
-  public int getTreeHeight(Node node) {
-    if (node == null) return 0;
-
-    if (node instanceof Operand) return 1;
-
-    if (node instanceof Function function) {
-      int leftHeight = getTreeHeight(function.getLeft());
-      int rightHeight = getTreeHeight(function.getRight());
-      return Math.max(leftHeight, rightHeight) + 1;
-    }
-
-    return 0;
-  }
-
-  public int getMaxWidth(Function root) {
-    if (root == null) return 0;
-
-    Map<Integer, Integer> levelCounts = new HashMap<>();
-    countNodesAtLevel(root, 0, levelCounts);
-
-    return levelCounts.values().stream().mapToInt(Integer::intValue).max().orElse(0);
-  }
-
-  private void countNodesAtLevel(Node node, int level, Map<Integer, Integer> levelCounts) {
-    if (node == null) return;
-
-    levelCounts.merge(level, 1, Integer::sum);
-
-    if (node instanceof Function function) {
-      countNodesAtLevel(function.getLeft(), level + 1, levelCounts);
-      countNodesAtLevel(function.getRight(), level + 1, levelCounts);
-    }
-  }
-
-  public void processTokenQuery(List<Token> tokens) {
-    List<Error> errors = new ArrayList<>();
-    Stack<SyntaxType> openedBrackets = new Stack<>();
-
-    validateTokenWith(errors, openedBrackets, tokens.getFirst(), START);
-
-    for (int i = 1; i < tokens.size(); i++) {
-      validateTokenWith(errors, openedBrackets,
-        tokens.get(i), getTokenSyntaxType(tokens.get(i - 1)));
-    }
-
-    Token lastToken = tokens.getLast();
-    if (!Set.of(CLOSE_BRACKET, FUNCTION_CLOSE_BRACKET, OPERAND, ERROR).contains(getTokenSyntaxType(lastToken))) {
-      errors.add(new Error(lastToken.getEndPosition(), lastToken.getEndPosition(), "Query cannot be finished with " + lastToken.getTokenType()));
-    }
-    if (!openedBrackets.isEmpty()) {
-      errors.add(new Error(lastToken.getEndPosition(), lastToken.getEndPosition(), "There are unclosed brackets in query"));
-    }
-
-    if (errors.isEmpty()) {
-      System.out.println("Query has no errors");
-    } else {
-      System.out.println("Errors: ");
-      for (int i = 0; i < errors.size(); i++) {
-        System.out.println(i + 1 + ". " + errors.get(i));
+      default -> {
+        return node;
       }
     }
   }
 
-  private void validateTokenWith(List<Error> errors, Stack<SyntaxType> openedBrackets, Token token,
-                                 SyntaxType previousTokenSyntaxType) {
-    Set<SyntaxType> allowedPositions = allowedCombinations.get(previousTokenSyntaxType);
-    SyntaxType syntaxType = getTokenSyntaxType(token);
-    try {
-      if (syntaxType == OPEN_BRACKET || syntaxType == FUNCTION_OPEN_BRACKET) {
-        openedBrackets.push(syntaxType);
-      } else if (syntaxType == CLOSE_BRACKET) {
-        SyntaxType pop = openedBrackets.pop();
-        if (pop != OPEN_BRACKET) {
-          throw new IllegalArgumentException("Regular bracket must be closed");
-        }
-      } else if (syntaxType == FUNCTION_CLOSE_BRACKET) {
-        SyntaxType pop = openedBrackets.pop();
-        if (pop != FUNCTION_OPEN_BRACKET) {
-          throw new IllegalArgumentException("Function bracket must be closed");
-        }
-      }
+  private Node applyAlgebraicOptimizations(Function func) {
+    SyntaxType operation = func.getOperation();
+    Node left = func.getLeft();
+    Node right = func.getRight();
 
-      if (token.getTokenType().equals(TokenType.INTEGER) && token.getValue().equals("0") && previousTokenSyntaxType.equals(OPERATION_DIVIDE)) {
-        errors.add(new Error(token.getEndPosition(), token.getEndPosition(), "Divide by zero"));
-      }
-
-      boolean isPlaceCorrect = allowedPositions.contains(syntaxType);
-      if (!isPlaceCorrect) {
-        String message = token.getTokenType() + " is unexpected.";
-        token.setTokenType(TokenType.ERROR);
-        errors.add(new Error(token.getStartPosition(), token.getEndPosition(), message));
-      }
-
-    } catch (EmptyStackException e) {
-      String message = token.getTokenType() + " is unexpected.";
-      token.setTokenType(TokenType.ERROR);
-      errors.add(new Error(token.getStartPosition(), token.getEndPosition(), message));
-    }
+    return switch (operation) {
+      case OPERATION_ADD -> optimizeAddition(func, left, right);
+      case OPERATION_MINUS -> optimizeSubtraction(func, left, right);
+      case OPERATION_MULTIPLY -> optimizeMultiplication(func, left, right);
+      case OPERATION_DIVIDE -> optimizeDivision(func, left, right);
+      default -> func;
+    };
   }
 
-  private SyntaxType getTokenSyntaxType(Token token) {
-    TokenType tokenType = token.getTokenType();
-    if (operandTypes.contains(tokenType)) {
-      if (tokenType.equals(TokenType.FUNCTION)) {
-        return FUNCTION;
+  private Node optimizeAddition(Function func, Node left, Node right) {
+    if (isZero(right)) {
+      return left;
+    }
+    if (isZero(left)) {
+      return right;
+    }
+
+    if (isNumeric(left) && isNumeric(right)) {
+      double leftVal = getNumericValue(left);
+      double rightVal = getNumericValue(right);
+      double result = leftVal + rightVal;
+      return createNumericOperand(result);
+    }
+
+    List<Node> additionTerms = new ArrayList<>();
+    double constantSum = 0.0;
+    boolean hasConstants = false;
+
+    collectAdditionTerms(func, additionTerms);
+
+    List<Node> variables = new ArrayList<>();
+    for (Node term : additionTerms) {
+      if (isNumeric(term)) {
+        constantSum += getNumericValue(term);
+        hasConstants = true;
       } else {
-        return OPERAND;
+        variables.add(term);
       }
-    } else if (tokenType.equals(TokenType.OPERATION_ADD)) {
-      return OPERATION_ADD;
-    }else if (tokenType.equals(TokenType.OPERATION_MINUS)) {
-      return OPERATION_MINUS;
-    } else if (tokenType.equals(TokenType.OPERATION_MULTIPLY)) {
-      return OPERATION_MULTIPLY;
-    } else if (tokenType.equals(TokenType.OPERATION_DIVIDE)) {
-      return OPERATION_DIVIDE;
-    } else if (tokenType.equals(TokenType.OPEN_BRACKET)) {
-      return OPEN_BRACKET;
-    } else if (tokenType.equals(TokenType.CLOSE_BRACKET)) {
-      return CLOSE_BRACKET;
-    } else if (tokenType.equals(TokenType.FUNCTION_OPEN_BRACKET)) {
-      return FUNCTION_OPEN_BRACKET;
-    } else if (tokenType.equals(TokenType.FUNCTION_CLOSE_BRACKET)) {
-      return FUNCTION_CLOSE_BRACKET;
+    }
+
+    List<Node> finalTerms = new ArrayList<>(variables);
+    if (hasConstants && constantSum != 0.0) {
+      finalTerms.add(createNumericOperand(constantSum));
+    }
+
+    if (finalTerms.isEmpty()) {
+      return createNumericOperand(0);
+    } else if (finalTerms.size() == 1) {
+      return finalTerms.getFirst();
     } else {
-      return ERROR;
+      return buildPerfectBalancedTree(finalTerms, OPERATION_ADD);
     }
   }
 
-  @Getter
-  @EqualsAndHashCode
-  private class Error {
-    private final Integer startPosition;
-
-    private final Integer endPosition;
-
-    private final String message;
-
-    public Error(Integer startPosition, Integer endPosition, String message) {
-      this.startPosition = startPosition;
-      this.endPosition = endPosition;
-      this.message = message;
+  private Node optimizeSubtraction(Function func, Node left, Node right) {
+    if (isZero(right)) {
+      return left;
     }
 
-    @Override
-    public String toString() {
-      return "Error: " + message +  " On position [" + startPosition + "; " + endPosition + "]";
+    if (isNumeric(left) && isNumeric(right)) {
+      double leftVal = getNumericValue(left);
+      double rightVal = getNumericValue(right);
+      double result = leftVal - rightVal;
+      return createNumericOperand(result);
     }
+
+    return func;
+  }
+
+  private Node optimizeMultiplication(Function func, Node left, Node right) {
+    if (isZero(left) || isZero(right)) {
+      return createNumericOperand(0);
+    }
+
+    if (isOne(right)) {
+      return left;
+    }
+    if (isOne(left)) {
+      return right;
+    }
+
+    if (isNumeric(left) && isNumeric(right)) {
+      double leftVal = getNumericValue(left);
+      double rightVal = getNumericValue(right);
+      double result = leftVal * rightVal;
+      return createNumericOperand(result);
+    }
+
+    return func;
+  }
+
+  private Node optimizeDivision(Function func, Node left, Node right) {
+    if (isOne(right)) {
+      return left;
+    }
+
+    if (isZero(left) && !isZero(right)) {
+      return createNumericOperand(0);
+    }
+
+    if (isNumeric(left) && isNumeric(right) && !isZero(right)) {
+      double leftVal = getNumericValue(left);
+      double rightVal = getNumericValue(right);
+      double result = leftVal / rightVal;
+      return createNumericOperand(result);
+    }
+
+    return func;
+  }
+
+  private void collectAdditionTerms(Node node, List<Node> terms) {
+    if (node instanceof Function func) {
+      if (func.getOperation() == OPERATION_ADD) {
+        collectAdditionTerms(func.getLeft(), terms);
+        collectAdditionTerms(func.getRight(), terms);
+        return;
+      }
+    }
+    terms.add(node);
+  }
+
+  private boolean isZero(Node node) {
+    if (node instanceof Operand operand) {
+      String value = operand.getValue();
+      try {
+        return Double.parseDouble(value) == 0.0;
+      } catch (NumberFormatException e) {
+        return false;
+      }
+    }
+    return false;
+  }
+
+  private boolean isOne(Node node) {
+    if (node instanceof Operand operand) {
+      String value = operand.getValue();
+      try {
+        return Double.parseDouble(value) == 1.0;
+      } catch (NumberFormatException e) {
+        return false;
+      }
+    }
+    return false;
+  }
+
+  private boolean isNumeric(Node node) {
+    if (node instanceof Operand operand) {
+      String value = operand.getValue();
+      try {
+        Double.parseDouble(value);
+        return true;
+      } catch (NumberFormatException e) {
+        return false;
+      }
+    }
+    return false;
+  }
+
+  private double getNumericValue(Node node) {
+    if (node instanceof Operand operand) {
+      try {
+        return Double.parseDouble(operand.getValue());
+      } catch (NumberFormatException e) {
+        return 0.0;
+      }
+    }
+    return 0.0;
+  }
+
+  private Node createNumericOperand(double value) {
+    String valueStr;
+    if (value == (long) value) {
+      valueStr = String.valueOf((long) value);
+    } else {
+      valueStr = String.valueOf(value);
+    }
+    return new Operand(OPERAND, valueStr);
+  }
+
+  private Function copyTree(Function root) {
+    if (root == null) {
+      return null;
+    }
+
+    Function copy = new Function();
+    copy.setOperation(root.getOperation());
+    copy.setLeft(copyNode(root.getLeft()));
+    copy.setRight(copyNode(root.getRight()));
+
+    return copy;
+  }
+
+  private Node copyNode(Node node) {
+    return switch (node) {
+      case Operand operand -> new Operand(operand.getType(), operand.getValue());
+      case Function function -> copyTree(function);
+      default -> null;
+    };
+  }
+
+  private boolean treesEqual(Function tree1, Function tree2) {
+    if (tree1 == null && tree2 == null) {
+      return true;
+    }
+    if (tree1 == null || tree2 == null) {
+      return false;
+    }
+
+    if (tree1.getOperation() != tree2.getOperation()) {
+      return false;
+    }
+
+    return nodesEqual(tree1.getLeft(), tree2.getLeft()) &&
+           nodesEqual(tree1.getRight(), tree2.getRight());
+  }
+
+  private boolean nodesEqual(Node node1, Node node2) {
+    if (node1 == null && node2 == null) {
+      return true;
+    }
+    if (node1 == null || node2 == null) {
+      return false;
+    }
+
+    if (node1.getClass() != node2.getClass()) {
+      return false;
+    }
+
+    if (node1 instanceof Operand op1 && node2 instanceof Operand op2) {
+      return op1.getValue().equals(op2.getValue());
+    } else if (node1 instanceof Function && node2 instanceof Function) {
+      return treesEqual((Function) node1, (Function) node2);
+    }
+
+    return false;
   }
 }
