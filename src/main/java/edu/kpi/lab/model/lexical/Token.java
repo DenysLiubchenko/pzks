@@ -1,4 +1,4 @@
-package edu.kpi.lab.lab1.model;
+package edu.kpi.lab.model.lexical;
 
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
