@@ -51,46 +51,37 @@ public class SyntaxAnalyzer {
       SyntaxType type = getTokenSyntaxType(token);
 
       switch (type) {
-        case OPERAND:
+        case OPERAND -> {
           currentOperands.add(new Operand(OPERAND, token.getValue()));
           expectOperand = false;
-          break;
-
-        case OPERATION_MINUS:
+        }
+        case OPERATION_MINUS -> {
           if (expectOperand) {
             currentOperands.add(new Operand(OPERAND, "0"));
             currentOperators.add(OPERATION_MINUS);
-            expectOperand = true;
           } else {
             currentOperators.add(OPERATION_MINUS);
             expectOperand = true;
           }
-          break;
-
-        case OPERATION_ADD:
-          if (expectOperand) {
-            expectOperand = true;
-          } else {
+        }
+        case OPERATION_ADD -> {
+          if (!expectOperand) {
             currentOperators.add(OPERATION_ADD);
             expectOperand = true;
           }
-          break;
-
-        case OPERATION_MULTIPLY:
-        case OPERATION_DIVIDE:
+        }
+        case OPERATION_MULTIPLY, OPERATION_DIVIDE -> {
           currentOperators.add(type);
           expectOperand = true;
-          break;
-
-        case OPEN_BRACKET:
+        }
+        case OPEN_BRACKET -> {
           operandStack.push(new ArrayList<>(currentOperands));
           operatorStack.push(new ArrayList<>(currentOperators));
           currentOperands = new ArrayList<>();
           currentOperators = new ArrayList<>();
           expectOperand = true;
-          break;
-
-        case CLOSE_BRACKET:
+        }
+        case CLOSE_BRACKET -> {
           if (!currentOperands.isEmpty()) {
             Function bracketResult = buildBalancedParallelTree(currentOperands, currentOperators);
             currentOperands = operandStack.pop();
@@ -98,7 +89,7 @@ public class SyntaxAnalyzer {
             currentOperands.add(bracketResult);
           }
           expectOperand = false;
-          break;
+        }
       }
     }
 
@@ -174,11 +165,11 @@ public class SyntaxAnalyzer {
         func.setLeft(left);
         func.setRight(right);
 
-        nextLevel.offer(func);
+        nextLevel.add(func);
       }
 
       if (!queue.isEmpty()) {
-        nextLevel.offer(queue.poll());
+        nextLevel.add(queue.poll());
       }
 
       queue = nextLevel;
@@ -187,7 +178,7 @@ public class SyntaxAnalyzer {
     return queue.poll();
   }
 
-  public Function optimizeTree(Function root) {
+  private Function optimizeTree(Function root) {
     if (root == null) {
       return null;
     }
@@ -199,7 +190,12 @@ public class SyntaxAnalyzer {
 
     do {
       previous = copyTree(current);
-      current = (Function) optimizeNode(current);
+      Node optimizedNode = optimizeNode(current);
+      if (optimizedNode instanceof Function) {
+        current = (Function) optimizedNode;
+      } else if (optimizedNode instanceof  Operand) {
+        return new Function(current, null, null);
+      }
       iterations++;
     } while (!treesEqual(current, previous) && iterations < maxIterations);
 
