@@ -29,8 +29,6 @@ public class Lab {
       "a-b*(k-t+(f-g)*(f*5.9-q)+(w-y*(m-1))/p)-(x-3)*(x+3)/(d+q-w)"
     );
 
-    System.out.println("Building parallel syntax trees and expanding brackets:");
-
     for (String expression : expressions) {
       List<Token> tokens = la.processMathSentence(expression);
       System.out.println("\nExpression: " + expression);

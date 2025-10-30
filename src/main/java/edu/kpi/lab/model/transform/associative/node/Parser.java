@@ -71,7 +71,7 @@ public class Parser {
       advance();
       return new Literal(t.getValue(), t.getTokenType());
     }
-    return null; // error
+    return null;
   }
 
   private Token peek() {
