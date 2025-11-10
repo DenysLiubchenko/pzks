@@ -3,7 +3,7 @@ package edu.kpi.lab.model.transform.commutative;
 import edu.kpi.lab.model.transform.commutative.node.Function;
 import edu.kpi.lab.model.lexical.Token;
 import edu.kpi.lab.model.lexical.TokenType;
-import edu.kpi.lab.model.syntax.SyntaxType;
+import edu.kpi.lab.model.syntax.tree.SyntaxType;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;

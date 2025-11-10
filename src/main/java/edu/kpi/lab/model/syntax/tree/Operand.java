@@ -1,6 +1,5 @@
 package edu.kpi.lab.model.syntax.tree;
 
-import edu.kpi.lab.model.syntax.SyntaxType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;

@@ -1,6 +1,5 @@
 package edu.kpi.lab.model.syntax.tree;
 
-import edu.kpi.lab.model.syntax.SyntaxType;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.AllArgsConstructor;

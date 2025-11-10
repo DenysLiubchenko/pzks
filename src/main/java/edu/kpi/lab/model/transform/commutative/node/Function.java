@@ -1,6 +1,6 @@
 package edu.kpi.lab.model.transform.commutative.node;
 
-import edu.kpi.lab.model.syntax.SyntaxType;
+import edu.kpi.lab.model.syntax.tree.SyntaxType;
 
 import java.util.Objects;
 import lombok.Getter;

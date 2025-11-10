@@ -2,6 +2,7 @@ package edu.kpi.lab.model.syntax;
 
 import edu.kpi.lab.model.lexical.Token;
 import edu.kpi.lab.model.lexical.TokenType;
+import edu.kpi.lab.model.syntax.tree.SyntaxType;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EmptyStackException;
@@ -14,19 +15,19 @@ import java.util.stream.Collectors;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
-import static edu.kpi.lab.model.syntax.SyntaxType.CLOSE_BRACKET;
-import static edu.kpi.lab.model.syntax.SyntaxType.ERROR;
-import static edu.kpi.lab.model.syntax.SyntaxType.FINISH;
-import static edu.kpi.lab.model.syntax.SyntaxType.FUNCTION;
-import static edu.kpi.lab.model.syntax.SyntaxType.FUNCTION_CLOSE_BRACKET;
-import static edu.kpi.lab.model.syntax.SyntaxType.FUNCTION_OPEN_BRACKET;
-import static edu.kpi.lab.model.syntax.SyntaxType.OPEN_BRACKET;
-import static edu.kpi.lab.model.syntax.SyntaxType.OPERAND;
-import static edu.kpi.lab.model.syntax.SyntaxType.OPERATION_ADD;
-import static edu.kpi.lab.model.syntax.SyntaxType.OPERATION_DIVIDE;
-import static edu.kpi.lab.model.syntax.SyntaxType.OPERATION_MINUS;
-import static edu.kpi.lab.model.syntax.SyntaxType.OPERATION_MULTIPLY;
-import static edu.kpi.lab.model.syntax.SyntaxType.START;
+import static edu.kpi.lab.model.syntax.tree.SyntaxType.CLOSE_BRACKET;
+import static edu.kpi.lab.model.syntax.tree.SyntaxType.ERROR;
+import static edu.kpi.lab.model.syntax.tree.SyntaxType.FINISH;
+import static edu.kpi.lab.model.syntax.tree.SyntaxType.FUNCTION;
+import static edu.kpi.lab.model.syntax.tree.SyntaxType.FUNCTION_CLOSE_BRACKET;
+import static edu.kpi.lab.model.syntax.tree.SyntaxType.FUNCTION_OPEN_BRACKET;
+import static edu.kpi.lab.model.syntax.tree.SyntaxType.OPEN_BRACKET;
+import static edu.kpi.lab.model.syntax.tree.SyntaxType.OPERAND;
+import static edu.kpi.lab.model.syntax.tree.SyntaxType.OPERATION_ADD;
+import static edu.kpi.lab.model.syntax.tree.SyntaxType.OPERATION_DIVIDE;
+import static edu.kpi.lab.model.syntax.tree.SyntaxType.OPERATION_MINUS;
+import static edu.kpi.lab.model.syntax.tree.SyntaxType.OPERATION_MULTIPLY;
+import static edu.kpi.lab.model.syntax.tree.SyntaxType.START;
 
 public class SyntaxValidator {
   private final Map<SyntaxType, Set<SyntaxType>> allowedCombinations;

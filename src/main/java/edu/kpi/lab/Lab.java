@@ -18,15 +18,16 @@ public class Lab {
     AssociativeTransformer associativeTransformer = new AssociativeTransformer();
 
     List<String> expressions = List.of(
-      "a+b*c+d", //b*c + a + d
-      "a*b+a*c", //a*(b+c)
-      "a*b+a*c+b*c",
-      "a*(b-2)+c*(b-2)",
-      "a*b-2*a+b*c-c*2",
-      "a/b-c/b+2/b",
-      "a/(b-1)-c/(b-1)+2/(b-1)-t",
-      "a-b*k+b*t-f*f*5.9+f*q+g*f*5.9-g*q-f/(d+q-w)-g/(d+q-w)",
-      "a-b*(k-t+(f-g)*(f*5.9-q)+(w-y*(m-1))/p)-(x-3)*(x+3)/(d+q-w)"
+      "a*(c+d2+e+f*(a+bc))+a*(b-g3-abc-q)-a*(5+3+2)",
+      "1.3-a*b+b*c-a*d"
+//      "a*b+a*c", //a*(b+c)
+//      "a*b+a*c+b*c",
+//      "a*(b-2)+c*(b-2)",
+//      "a*b-2*a+b*c-c*2",
+//      "a/b-c/b+2/b",
+//      "a/(b-1)-c/(b-1)+2/(b-1)-t",
+//      "a-b*k+b*t-f*f*5.9+f*q+g*f*5.9-g*q-f/(d+q-w)-g/(d+q-w)",
+//      "a-b*(k-t+(f-g)*(f*5.9-q)+(w-y*(m-1))/p)-(x-3)*(x+3)/(d+q-w)"
     );
 
     for (String expression : expressions) {

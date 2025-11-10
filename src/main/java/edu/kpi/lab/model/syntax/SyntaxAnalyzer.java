@@ -4,17 +4,18 @@ import edu.kpi.lab.model.lexical.Token;
 import edu.kpi.lab.model.syntax.tree.Function;
 import edu.kpi.lab.model.syntax.tree.Node;
 import edu.kpi.lab.model.syntax.tree.Operand;
+import edu.kpi.lab.model.syntax.tree.SyntaxType;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.Stack;
 
-import static edu.kpi.lab.model.syntax.SyntaxType.OPERAND;
-import static edu.kpi.lab.model.syntax.SyntaxType.OPERATION_ADD;
-import static edu.kpi.lab.model.syntax.SyntaxType.OPERATION_DIVIDE;
-import static edu.kpi.lab.model.syntax.SyntaxType.OPERATION_MINUS;
-import static edu.kpi.lab.model.syntax.SyntaxType.OPERATION_MULTIPLY;
+import static edu.kpi.lab.model.syntax.tree.SyntaxType.OPERAND;
+import static edu.kpi.lab.model.syntax.tree.SyntaxType.OPERATION_ADD;
+import static edu.kpi.lab.model.syntax.tree.SyntaxType.OPERATION_DIVIDE;
+import static edu.kpi.lab.model.syntax.tree.SyntaxType.OPERATION_MINUS;
+import static edu.kpi.lab.model.syntax.tree.SyntaxType.OPERATION_MULTIPLY;
 import static edu.kpi.lab.model.syntax.SyntaxValidator.getTokenSyntaxType;
 
 public class SyntaxAnalyzer {

@@ -1,4 +1,4 @@
-package edu.kpi.lab.model.syntax;
+package edu.kpi.lab.model.syntax.tree;
 
 import java.util.Set;
 
