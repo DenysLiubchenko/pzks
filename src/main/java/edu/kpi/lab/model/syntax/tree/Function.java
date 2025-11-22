@@ -18,6 +18,10 @@ public class Function extends Node{
 
   private SyntaxType operation;
 
+  public String getName() {
+    return operation.name() + "_" + getId();
+  }
+
   public void printTreeStructure() {
     System.out.println("Parallel Tree Structure:");
     printTreeStructure(this, 0, "Root");
@@ -33,7 +37,7 @@ public class Function extends Node{
     String indent = "  ".repeat(level);
 
     if (node instanceof Function function) {
-      System.out.println(indent + position + ": Operation: " + function.getOperation());
+      System.out.println(indent + position + ": Operation: " + function.getName());
 
       if (function.getLeft() != null) {
         printTreeStructure(function.getLeft(), level + 1, "Left");

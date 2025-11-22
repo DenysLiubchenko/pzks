@@ -11,12 +11,12 @@ import java.util.List;
 import java.util.Queue;
 import java.util.Stack;
 
+import static edu.kpi.lab.model.syntax.SyntaxValidator.getTokenSyntaxType;
 import static edu.kpi.lab.model.syntax.tree.SyntaxType.OPERAND;
 import static edu.kpi.lab.model.syntax.tree.SyntaxType.OPERATION_ADD;
 import static edu.kpi.lab.model.syntax.tree.SyntaxType.OPERATION_DIVIDE;
 import static edu.kpi.lab.model.syntax.tree.SyntaxType.OPERATION_MINUS;
 import static edu.kpi.lab.model.syntax.tree.SyntaxType.OPERATION_MULTIPLY;
-import static edu.kpi.lab.model.syntax.SyntaxValidator.getTokenSyntaxType;
 
 public class SyntaxAnalyzer {
 
@@ -117,6 +117,7 @@ public class SyntaxAnalyzer {
           operands.size(), operators.size(), operands.size() - 1));
     }
 
+    // First pass: handle high-precedence operations (multiply/divide)
     List<Node> processedOperands = new ArrayList<>();
     List<SyntaxType> lowPrecedenceOps = new ArrayList<>();
 
@@ -143,8 +144,62 @@ public class SyntaxAnalyzer {
       return (Function) processedOperands.getFirst();
     }
 
-    SyntaxType operation = lowPrecedenceOps.getFirst();
-    return (Function) buildPerfectBalancedTree(processedOperands, operation);
+    return buildBalancedAddSubTree(processedOperands, lowPrecedenceOps);
+  }
+
+  private Function buildBalancedAddSubTree(List<Node> operands, List<SyntaxType> operators) {
+    if (operands.size() == 1) {
+      if (operands.getFirst() instanceof Function) {
+        return (Function) operands.getFirst();
+      }
+      throw new IllegalArgumentException("Single operand cannot form expression tree");
+    }
+
+    if (operands.size() != operators.size() + 1) {
+      throw new IllegalArgumentException("Operands and operators size mismatch");
+    }
+
+    Queue<Node> nodeQueue = new LinkedList<>(operands);
+    Queue<SyntaxType> opQueue = new LinkedList<>(operators);
+
+    while (nodeQueue.size() > 1) {
+      Queue<Node> nextLevelNodes = new LinkedList<>();
+      Queue<SyntaxType> nextLevelOps = new LinkedList<>();
+
+      while (nodeQueue.size() >= 2 && !opQueue.isEmpty()) {
+        Node left = nodeQueue.poll();
+        SyntaxType op = opQueue.poll();
+        Node right = nodeQueue.poll();
+
+        Function func = new Function();
+        func.setOperation(op);
+        func.setLeft(left);
+        func.setRight(right);
+
+        nextLevelNodes.add(func);
+
+        if (!opQueue.isEmpty() && !nodeQueue.isEmpty()) {
+          nextLevelOps.add(opQueue.poll());
+        }
+      }
+
+      while (!nodeQueue.isEmpty()) {
+        nextLevelNodes.add(nodeQueue.poll());
+      }
+      while (!opQueue.isEmpty()) {
+        nextLevelOps.add(opQueue.poll());
+      }
+
+      nodeQueue = nextLevelNodes;
+      opQueue = nextLevelOps;
+    }
+
+    Node result = nodeQueue.poll();
+    if (result instanceof Function) {
+      return (Function) result;
+    }
+
+    throw new IllegalStateException("Failed to build valid tree");
   }
 
   private Node buildPerfectBalancedTree(List<Node> operands, SyntaxType operation) {
@@ -194,7 +249,7 @@ public class SyntaxAnalyzer {
       Node optimizedNode = optimizeNode(current);
       if (optimizedNode instanceof Function) {
         current = (Function) optimizedNode;
-      } else if (optimizedNode instanceof  Operand) {
+      } else if (optimizedNode instanceof Operand) {
         return new Function(current, null, null);
       }
       iterations++;
@@ -209,6 +264,13 @@ public class SyntaxAnalyzer {
         return null;
       }
       case Function func -> {
+        if (func.getOperation() == null) {
+          System.err.println("ERROR: Function node with null operation detected!");
+          System.err.println("Left: " + func.getLeft());
+          System.err.println("Right: " + func.getRight());
+          throw new IllegalStateException("Function node has null operation");
+        }
+
         Node leftOptimized = optimizeNode(func.getLeft());
         Node rightOptimized = optimizeNode(func.getRight());
 
