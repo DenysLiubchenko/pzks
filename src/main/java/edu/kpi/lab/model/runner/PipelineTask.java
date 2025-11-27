@@ -6,21 +6,31 @@ import lombok.Data;
 
 @Data
 public class PipelineTask {
-  private int processorId;
   private Node node;
+  private String nodeIdShort;
   private SyntaxType operation;
-  private int startTime;
-  private int finishTime;
-  private String stage;
-  private boolean active = true; // Чи операція активна в цьому шарі
 
-  public PipelineTask(int processorId, Node node, SyntaxType operation,
-                      int startTime, int finishTime) {
-    this.processorId = processorId;
+  private int readTime;
+  private int executionStartTime;
+  private int latencyPerStage;
+  private int writeTime;
+
+  public PipelineTask(Node node, String shortId, SyntaxType operation, int readTime, int latencyPerStage,
+                      int numStages) {
     this.node = node;
+    this.nodeIdShort = shortId;
     this.operation = operation;
-    this.startTime = startTime;
-    this.finishTime = finishTime;
-    this.active = true;
+    this.readTime = readTime;
+    this.latencyPerStage = latencyPerStage;
+
+    this.executionStartTime = readTime + 1;
+
+    int executionDuration = numStages * latencyPerStage;
+
+    this.writeTime = executionStartTime + executionDuration;
+  }
+
+  public int getTotalFinishTime() {
+    return writeTime + 1;
   }
 }

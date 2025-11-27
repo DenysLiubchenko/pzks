@@ -4,51 +4,49 @@ import edu.kpi.lab.model.syntax.tree.Function;
 import edu.kpi.lab.model.syntax.tree.Node;
 import edu.kpi.lab.model.syntax.tree.Operand;
 import edu.kpi.lab.model.syntax.tree.SyntaxType;
-import lombok.Getter;
-import lombok.Setter;
-
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class StaticPipelineExecutionSimulator {
 
   private static final int NUM_STAGES = 6;
-
-  private static final Map<SyntaxType, Integer> OPERATION_TIME = Map.of(
+  private static final Map<SyntaxType, Integer> LATENCY_PER_STAGE = Map.of(
     SyntaxType.OPERATION_ADD, 1,
     SyntaxType.OPERATION_MINUS, 1,
     SyntaxType.OPERATION_MULTIPLY, 2,
     SyntaxType.OPERATION_DIVIDE, 3
   );
 
-  private Function tree;
-  private Map<Node, Set<Node>> nodeDependencies;
-  private Map<Node, Integer> nodeFinishTime;
-  private List<Node> executionOrder;
-  private List<PipelineTask> executionSchedule;
+  private final Function tree;
+  private final Map<Node, Set<Node>> nodeDependencies;
+  private final Map<Node, Integer> nodeFinishTime;
+  private final List<PipelineTask> executionSchedule;
 
-  private int[] stageAvailableTime;
-  private int readWriteAvailableTime;
+  private final Set<Integer> busBusyTime;
+
+  private SyntaxType currentPipelineType;
+  private int pipelineDrainTime;
+  private int lastReadTime;
 
   public StaticPipelineExecutionSimulator(Function tree) {
     this.tree = tree;
     this.nodeDependencies = new HashMap<>();
     this.nodeFinishTime = new HashMap<>();
-    this.executionOrder = new ArrayList<>();
     this.executionSchedule = new ArrayList<>();
-    this.stageAvailableTime = new int[NUM_STAGES];
-    this.readWriteAvailableTime = 0;
+    this.busBusyTime = new HashSet<>();
+
+    this.currentPipelineType = null;
+    this.pipelineDrainTime = 0;
+    this.lastReadTime = -100;
   }
 
   public SimulationResult simulate() {
-    System.out.println("=== Статичний конвеєр ===");
-    System.out.println("Кількість шарів: " + NUM_STAGES);
-    System.out.println();
-
-    printOperationTimes();
-
     buildDependencyGraph();
-    buildExecutionOrder();
     scheduleExecution();
 
     int parallelTime = getMaxFinishTime();
@@ -57,22 +55,13 @@ public class StaticPipelineExecutionSimulator {
     SimulationResult result = new SimulationResult();
     result.setSequentialTime(sequentialTime);
     result.setParallelTime(parallelTime);
-    result.setSpeedup((double) sequentialTime / parallelTime);
-    result.setActiveProcessors(NUM_STAGES);
-    result.setTotalProcessors(NUM_STAGES);
-    result.setEfficiencyActive(result.getSpeedup() / NUM_STAGES);
-    result.setEfficiencyTotal(result.getSpeedup() / NUM_STAGES);
+    result.setSpeedup(parallelTime > 0 ? (double) sequentialTime / parallelTime : 0);
+    result.setActiveProcessors(1);
+    result.setTotalProcessors(1);
+    result.setEfficiencyActive(result.getSpeedup());
+    result.setEfficiencyTotal(result.getSpeedup());
 
     return result;
-  }
-
-  private void printOperationTimes() {
-    System.out.println("--- Час виконання ---");
-    System.out.println("Додавання/Віднімання: 1 такт × 6 шарів = 6 тактів");
-    System.out.println("Множення: 2 такти × 6 шарів = 12 тактів");
-    System.out.println("Ділення: 3 такти × 6 шарів = 18 тактів");
-    System.out.println("Read/Write: 1 такт");
-    System.out.println();
   }
 
   private void buildDependencyGraph() {
@@ -83,243 +72,191 @@ public class StaticPipelineExecutionSimulator {
     if (node == null) {
       return new HashSet<>();
     }
-
     if (node instanceof Operand) {
-      nodeDependencies.put(node, new HashSet<>());
       nodeFinishTime.put(node, 0);
       return new HashSet<>();
     }
-
     if (node instanceof Function f) {
       Set<Node> dependencies = new HashSet<>();
-
-      Set<Node> leftDeps = collectDependencies(f.getLeft());
-      dependencies.addAll(leftDeps);
+      dependencies.addAll(collectDependencies(f.getLeft()));
       if (f.getLeft() instanceof Function) {
         dependencies.add(f.getLeft());
       }
-
-      Set<Node> rightDeps = collectDependencies(f.getRight());
-      dependencies.addAll(rightDeps);
+      dependencies.addAll(collectDependencies(f.getRight()));
       if (f.getRight() instanceof Function) {
         dependencies.add(f.getRight());
       }
-
       nodeDependencies.put(node, dependencies);
-
-      Set<Node> allNodesInSubtree = new HashSet<>(dependencies);
-      allNodesInSubtree.add(node);
-
-      return allNodesInSubtree;
+      Set<Node> allSubtree = new HashSet<>(dependencies);
+      allSubtree.add(node);
+      return allSubtree;
     }
-
     return new HashSet<>();
   }
 
-  private void buildExecutionOrder() {
-    System.out.println("--- Порядок виконання ---");
-
-    List<Node> allNodes = new ArrayList<>();
-    collectAllNodes(tree, allNodes);
-
-    List<Function> allOperations = allNodes.stream()
-      .filter(n -> n instanceof Function)
-      .map(n -> (Function) n)
-      .collect(Collectors.toList());
-
-    allOperations.sort(Comparator.comparingInt(f -> nodeDependencies.get(f).size()));
-
-    executionOrder.addAll(allOperations);
-
-    for (int i = 0; i < executionOrder.size(); i++) {
-      Function f = (Function) executionOrder.get(i);
-      System.out.println((i + 1) + ". " + f.getOperation() +
-                         " (залежностей: " + nodeDependencies.get(f).size() + ")");
-    }
-    System.out.println();
-  }
-
-  private void collectAllNodes(Node node, List<Node> result) {
-    if (node == null) return;
-    result.add(node);
-    if (node instanceof Function f) {
-      collectAllNodes(f.getLeft(), result);
-      collectAllNodes(f.getRight(), result);
-    }
-  }
-
   private void scheduleExecution() {
-    System.out.println("--- Виконання ---");
+    System.out.println("--- Планування ---");
 
-    // Групуємо операції за типом, зберігаючи порядок
-    Map<SyntaxType, List<Function>> operationsByType = new LinkedHashMap<>();
-    for (Node node : executionOrder) {
-      if (node instanceof Function f) {
-        operationsByType.computeIfAbsent(f.getOperation(), k -> new ArrayList<>()).add(f);
-      }
-    }
+    List<Function> allOperations = new ArrayList<>(nodeDependencies.keySet().stream()
+      .map(n -> (Function) n)
+      .toList());
 
-    int allStagesFreeTime = 0; // Коли всі шари звільнилися
+    Set<Node> scheduledNodes = new HashSet<>();
+    int currentTime = 0;
+    int opCounter = 1;
+    Map<Node, String> nodeShortIds = new HashMap<>();
 
-    // Для кожного типу операції виконуємо конвеєрно
-    for (Map.Entry<SyntaxType, List<Function>> entry : operationsByType.entrySet()) {
-      SyntaxType opType = entry.getKey();
-      List<Function> operations = entry.getValue();
-      int operationDuration = OPERATION_TIME.get(opType);
+    while (scheduledNodes.size() < allOperations.size()) {
 
-      // Початок обробки нового типу - чекаємо поки всі шари звільняться
-      Arrays.fill(stageAvailableTime, allStagesFreeTime);
+      int finalCurrentTime = currentTime;
+      List<Function> readyCandidates = allOperations.stream()
+        .filter(op -> !scheduledNodes.contains(op))
+        .filter(op -> {
+          Set<Node> deps = nodeDependencies.get(op);
+          return deps.stream()
+            .allMatch(d -> nodeFinishTime.containsKey(d) && nodeFinishTime.get(d) <= finalCurrentTime);
+        })
+        .sorted((f1, f2) -> {
+          boolean f1Same = f1.getOperation() == currentPipelineType;
+          boolean f2Same = f2.getOperation() == currentPipelineType;
+          if (f1Same && !f2Same) {
+            return -1;
+          }
+          return 0;
+        })
+        .toList();
 
-      for (Function operation : operations) {
-        int dependenciesReadyTime = getDependenciesReadyTime(operation);
+      Function bestCandidate = null;
 
-        // READ - глобальна блокування
-        int readStart = Math.max(dependenciesReadyTime, readWriteAvailableTime);
-        int readFinish = readStart + 1;
+      for (Function candidate : readyCandidates) {
+        SyntaxType type = candidate.getOperation();
+        int latency = LATENCY_PER_STAGE.get(type);
 
-        PipelineTask readTask = new PipelineTask(-1, operation, null, readStart, readFinish);
-        readTask.setStage("READ");
-        executionSchedule.add(readTask);
+        boolean canStartPipeline;
 
-        // Шари - конвеєрна обробка для операцій одного типу
-        int prevStageFinish = readFinish;
-
-        for (int stage = 0; stage < NUM_STAGES; stage++) {
-          int stageStart = Math.max(prevStageFinish, stageAvailableTime[stage]);
-          int stageFinish = stageStart + operationDuration;
-
-          stageAvailableTime[stage] = stageFinish;
-          prevStageFinish = stageFinish;
-
-          PipelineTask stageTask = new PipelineTask(stage, operation, opType, stageStart, stageFinish);
-          stageTask.setStage("S" + (stage + 1));
-          stageTask.setActive(true);
-          executionSchedule.add(stageTask);
+        if (currentPipelineType == null) {
+          canStartPipeline = true;
+        } else if (currentPipelineType == type) {
+          canStartPipeline = (currentTime >= lastReadTime + latency);
+        } else {
+          canStartPipeline = (currentTime > pipelineDrainTime);
         }
 
-        // WRITE - глобальна блокування
-        int writeStart = Math.max(prevStageFinish, readWriteAvailableTime);
-        int writeFinish = writeStart + 1;
-        readWriteAvailableTime = writeFinish;
+        if (!canStartPipeline) {
+          continue;
+        }
 
-        PipelineTask writeTask = new PipelineTask(-2, operation, null, writeStart, writeFinish);
-        writeTask.setStage("WRITE");
-        executionSchedule.add(writeTask);
-
-        nodeFinishTime.put(operation, writeFinish);
-
-        System.out.println(opType + ": READ[" + readStart + "] -> S1-S6[" +
-                           readFinish + "-" + prevStageFinish + "] -> WRITE[" + writeStart + "]");
+        int totalExecutionTime = latency * NUM_STAGES;
+        int potentialWriteTime = currentTime + 1 + totalExecutionTime;
+        if (!busBusyTime.contains(currentTime) && !busBusyTime.contains(potentialWriteTime)) {
+          bestCandidate = candidate;
+          break;
+        }
       }
 
-      // Знаходимо коли всі шари звільнилися після цього типу
-      allStagesFreeTime = Arrays.stream(stageAvailableTime).max().orElse(0);
+      if (bestCandidate != null) {
+        String name = bestCandidate.getName();
+        SyntaxType type = bestCandidate.getOperation();
+        int latency = LATENCY_PER_STAGE.get(type);
+
+        if (currentPipelineType != type) {
+          currentPipelineType = type;
+        }
+
+        String shortId = String.valueOf(opCounter++);
+        nodeShortIds.put(bestCandidate, shortId);
+
+        PipelineTask task = new PipelineTask(
+          bestCandidate, shortId, type,
+          currentTime, latency, NUM_STAGES
+        );
+        executionSchedule.add(task);
+        scheduledNodes.add(bestCandidate);
+
+        busBusyTime.add(task.getReadTime());
+        busBusyTime.add(task.getWriteTime());
+
+        nodeFinishTime.put(bestCandidate, task.getTotalFinishTime());
+        pipelineDrainTime = task.getWriteTime();
+        lastReadTime = currentTime;
+
+        System.out.println("Scheduled [" + shortId + "] " + name + " at T=" + currentTime);
+      }
+
+      currentTime++;
+      if (currentTime > 2000) {
+        break;
+      }
     }
-    System.out.println();
   }
 
-  private int getDependenciesReadyTime(Function operation) {
-    Set<Node> dependencies = nodeDependencies.get(operation);
-
-    if (dependencies == null || dependencies.isEmpty()) {
-      return 0;
-    }
-
-    int maxTime = 0;
-    for (Node dep : dependencies) {
-      int depFinishTime = nodeFinishTime.getOrDefault(dep, 0);
-      maxTime = Math.max(maxTime, depFinishTime);
-    }
-
-    return maxTime;
+  private int calculateSequentialTime() {
+    return executionSchedule.stream()
+      .mapToInt(t -> 1 + (LATENCY_PER_STAGE.get(t.getOperation()) * NUM_STAGES) + 1)
+      .sum();
   }
 
   private int getMaxFinishTime() {
     return executionSchedule.stream()
-      .mapToInt(PipelineTask::getFinishTime)
+      .mapToInt(PipelineTask::getTotalFinishTime)
       .max()
       .orElse(0);
   }
 
-  private int calculateSequentialTime() {
-    int total = 0;
-    for (Node node : executionOrder) {
-      if (node instanceof Function f) {
-        int opTime = OPERATION_TIME.get(f.getOperation());
-        total += 1 + opTime + 1;
-      }
-    }
-    return total;
-  }
-
   public void printGanttChart() {
-    System.out.println("=== Діаграма Ганта ===");
-
+    System.out.println("\n=== Діаграма Ганта ===");
     int maxTime = getMaxFinishTime();
 
-    Map<String, List<PipelineTask>> tasksByStage = new HashMap<>();
-    tasksByStage.put("READ", new ArrayList<>());
-    for (int i = 1; i <= NUM_STAGES; i++) {
-      tasksByStage.put("S" + i, new ArrayList<>());
-    }
-    tasksByStage.put("WRITE", new ArrayList<>());
-
-    for (PipelineTask task : executionSchedule) {
-      tasksByStage.get(task.getStage()).add(task);
-    }
-
-    System.out.print("       ");
+    System.out.print("      ");
     for (int t = 0; t <= maxTime; t++) {
-      System.out.printf("%3d", t);
+      System.out.printf("%-3d", t);
     }
     System.out.println();
-    System.out.println("       " + "---".repeat(maxTime + 1));
+    System.out.println("-".repeat(6 + (maxTime + 1) * 3));
 
-    printStageLine("READ", tasksByStage.get("READ"), maxTime);
-
+    String[] rows = new String[NUM_STAGES + 2];
+    rows[0] = "READ ";
     for (int i = 1; i <= NUM_STAGES; i++) {
-      printStageLine("S" + i, tasksByStage.get("S" + i), maxTime);
+      rows[i] = "S" + i + "   ";
     }
+    rows[NUM_STAGES + 1] = "WRITE";
 
-    printStageLine("WRITE", tasksByStage.get("WRITE"), maxTime);
+    for (int r = 0; r < rows.length; r++) {
+      System.out.print(rows[r] + " |");
 
-    System.out.println("       " + "---".repeat(maxTime + 1));
-    System.out.println();
-
-    System.out.println("Операції:");
-    int opNum = 1;
-    for (Node node : executionOrder) {
-      if (node instanceof Function f) {
-        System.out.println("[" + opNum + "] " + f.getOperation());
-        opNum++;
+      for (int t = 0; t <= maxTime; t++) {
+        String cell = getCell(r, t);
+        System.out.print(cell);
       }
+      System.out.println();
     }
-    System.out.println();
+    System.out.println("-".repeat(6 + (maxTime + 1) * 3));
   }
 
-  private void printStageLine(String stageName, List<PipelineTask> tasks, int maxTime) {
-    System.out.printf("%-6s|", stageName);
+  private String getCell(int stageIndex, int t) {
+    String cell = "   ";
+    for (PipelineTask task : executionSchedule) {
+      String id = "[" + task.getNodeIdShort() + "]";
 
-    tasks.sort(Comparator.comparingInt(PipelineTask::getStartTime));
+      if (stageIndex == 0) {
+        if (task.getReadTime() == t) {
+          cell = String.format("%-3s", id);
+        }
+      } else if (stageIndex == NUM_STAGES + 1) {
+        if (task.getWriteTime() == t) {
+          cell = String.format("%-3s", id);
+        }
+      } else {
+        int latency = task.getLatencyPerStage();
 
-    int currentTime = 0;
-    for (PipelineTask task : tasks) {
-      while (currentTime < task.getStartTime()) {
-        System.out.print("   ");
-        currentTime++;
-      }
-      while (currentTime < task.getFinishTime()) {
-        int opIndex = executionOrder.indexOf(task.getNode()) + 1;
-        System.out.printf("[%d]", opIndex);
-        currentTime++;
+        int enterStageTime = task.getExecutionStartTime() + (stageIndex - 1) * latency;
+        int exitStageTime = enterStageTime + latency;
+
+        if (t >= enterStageTime && t < exitStageTime) {
+          cell = String.format("%-3s", id);
+        }
       }
     }
-
-    while (currentTime <= maxTime) {
-      System.out.print("   ");
-      currentTime++;
-    }
-
-    System.out.println("|");
+    return cell;
   }
 }
