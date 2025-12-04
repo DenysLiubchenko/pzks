@@ -56,8 +56,8 @@ public class StaticPipelineExecutionSimulator {
     result.setSequentialTime(sequentialTime);
     result.setParallelTime(parallelTime);
     result.setSpeedup(parallelTime > 0 ? (double) sequentialTime / parallelTime : 0);
-    result.setActiveProcessors(1);
-    result.setTotalProcessors(1);
+    result.setActiveProcessors(6);
+    result.setTotalProcessors(6);
     result.setEfficiencyActive(result.getSpeedup());
     result.setEfficiencyTotal(result.getSpeedup());
 
