@@ -16,6 +16,7 @@ public class Lab {
     SyntaxAnalyzer sa = new SyntaxAnalyzer();
 
     List<String> expressions = List.of(
+      "(a+b+c/d+d-e-g*h+i/j)+(a+b+c/d+d-e-g*h+i/j)",
       "a+b+c/d+d-e-g*h+i/j",
       "a*b+a*c",
       "a*b+a*c+b*c",
