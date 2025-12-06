@@ -10,7 +10,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 public class StaticPipelineExecutionSimulator {
 
@@ -56,10 +55,8 @@ public class StaticPipelineExecutionSimulator {
     result.setSequentialTime(sequentialTime);
     result.setParallelTime(parallelTime);
     result.setSpeedup(parallelTime > 0 ? (double) sequentialTime / parallelTime : 0);
-    result.setActiveProcessors(NUM_STAGES);
     result.setTotalProcessors(NUM_STAGES);
-    result.setEfficiencyActive(result.getSpeedup() / NUM_STAGES);
-    result.setEfficiencyTotal(result.getSpeedup() / NUM_STAGES);
+    result.setEfficiency(result.getSpeedup() / NUM_STAGES);
     return result;
   }
 
@@ -94,7 +91,7 @@ public class StaticPipelineExecutionSimulator {
   }
 
   private void scheduleExecution() {
-    System.out.println("--- Планування ---");
+//    System.out.println("--- Планування ---");
 
     List<Function> allOperations = new ArrayList<>(nodeDependencies.keySet().stream()
       .map(n -> (Function) n)
@@ -179,7 +176,7 @@ public class StaticPipelineExecutionSimulator {
         pipelineDrainTime = task.getWriteTime();
         lastReadTime = currentTime;
 
-        System.out.println("Scheduled [" + shortId + "] " + name + " at T=" + currentTime);
+//        System.out.println("Scheduled [" + shortId + "] " + name + " at T=" + currentTime);
       }
 
       currentTime++;
